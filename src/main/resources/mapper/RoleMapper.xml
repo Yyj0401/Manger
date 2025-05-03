@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.yst.management.mapper.RoleMapper">
+
+
+    <resultMap id="PermissionApiCustomMap" type="com.yst.management.entity.vo.PermissionApiParantChildVo">
+        <id property="permissionId" column="permissionId"></id>
+        <result property="permissionPid" column="permissionPid"></result>
+        <result property="permissionName" column="permissionName"></result>
+        <result property="apiPath" column="apiPath"></result>
+        <collection property="children" column="{roleId=roleId,permissionId=permissionId}"
+                    ofType="com.yst.management.entity.vo.PermissionApiParantChildVo" javaType="java.util.ArrayList"
+                    select="getParentChildTree">
+        </collection>
+    </resultMap>
+    <sql id="roleAndPermissionFields">
+        r.id as roleId,r.name as roleName,r.permission_ids as permissionIds,r.description as roleDesc,p.id as
+        permissionId,p.pid as permissionPid,p.name as permissionName,pa.api_path as apiPath
+    </sql>
+    <sql id="roleAndPermissionSelect">
+        SELECT
+        <include refid="roleAndPermissionFields"></include>
+        FROM role as r LEFT JOIN permission_api as pa on FIND_IN_SET(pa.permission_id,r.permission_ids) LEFT JOIN
+        permission as p ON p.id=pa.permission_id
+    </sql>
+    <!--获取角色权限树状列表-->
+    <select id="getAllRoleTreeById" parameterType="integer" resultMap="PermissionApiCustomMap">
+        <include refid="roleAndPermissionSelect"></include>
+        WHERE r.id=#{roleId} and p.pid=0
+    </select>
+    <select id="getParentChildTree" parameterType="map" resultMap="PermissionApiCustomMap">
+        <include refid="roleAndPermissionSelect"></include>
+        WHERE r.id=#{roleId} and p.pid=#{permissionId}
+    </select>
+
+    <!--获取角色列表-->
+    <select id="getAllRoleList" resultType="com.yst.management.entity.Role">
+        select *
+        from role
+        ORDER BY id ASC
+    </select>
+
+
+    <!--添加角色-->
+    <insert id="createRole" useGeneratedKeys="true" keyProperty="id" parameterType="com.yst.management.entity.Role">
+        INSERT INTO role(name, description)
+        VALUES (#{name}, #{description})
+    </insert>
+
+    <!--根据角色id获取角色信息-->
+    <select id="getRoleById" parameterType="integer" resultType="com.yst.management.entity.Role">
+        SELECT *
+        FROM role
+        WHERE id = #{id}
+    </select>
+
+    <!--更新角色-->
+    <update id="updateRole" parameterType="com.yst.management.entity.Role">
+        UPDATE role
+        SET name=#{name},
+            description=#{description}
+        WHERE id = #{id}
+    </update>
+
+    <!--删除角色-->
+    <delete id="deleteRole" parameterType="integer">
+        DELETE
+        FROM role
+        WHERE id = #{id}
+    </delete>
+
+    <!--角色权限分配-->
+    <update id="setRole" parameterType="com.yst.management.entity.Role">
+        UPDATE role
+        SET permission_ids=#{permissionIds}
+        WHERE id = #{id}
+    </update>
+
+    <!--根据角色名查询角色-->
+    <select id="getRoleByName" parameterType="string" resultType="com.yst.management.entity.Role">
+        SELECT *
+        FROM role
+        WHERE name = #{name}
+    </select>
+
+    <!--根据角色id和角色名查询角色：角色防止重复角色名-->
+    <select id="getRoleByIdAndName" resultType="com.yst.management.entity.Role">
+        SELECT *
+        FROM role
+        WHERE name = #{name}
+          AND id != #{id}
+    </select>
+
+
+    <!--根据管理员id查角色信息-->
+    <select id="getPermissionByRoleId" parameterType="int" resultType="com.yst.management.entity.dto.PermissionCustom">
+        <include refid="roleAndPermissionSelect"></include>
+        WHERE r.id=#{roleId}
+    </select>
+
+</mapper>

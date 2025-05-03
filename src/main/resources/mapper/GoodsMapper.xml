@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.yst.management.mapper.GoodsMapper">
+
+    <sql id="getOrderQuery">
+        <where>
+            <if test="goodsName != null and goodsName != ''">
+                and BINARY goods_name like concat("%",#{goodsName},"%")
+            </if>
+            <if test="isPromote != null">
+                and is_promote=#{isPromote}
+            </if>
+            <if test="goodsState != null">
+                and goods_state=#{goodsState}
+            </if>
+            and is_delete = 0
+        </where>
+    </sql>
+
+    <!--商品分页查询-->
+    <select id="getGoodsByPage" resultType="com.yst.management.entity.Goods">
+        SELECT * FROM goods
+        <include refid="getOrderQuery"></include>
+        ORDER BY create_time DESC
+        LIMIT #{startPage},#{pageSize}
+    </select>
+
+    <!--商品总数查询-->
+    <select id="getGoodsCount" resultType="long">
+        SELECT COUNT(1)
+        FROM goods
+        <include refid="getOrderQuery"></include>
+    </select>
+
+    <!--删除商品：逻辑删除-->
+    <update id="deleteGoodsById">
+        UPDATE goods
+        SET is_delete=1,delete_time=#{deleteTime}
+        where goods_id = #{goodsId}
+    </update>
+
+    <resultMap id="goodsMap" type="com.yst.management.entity.vo.GoodsVo">
+        <id property="goodsId" column="goods_id"></id>
+        <result property="goodsName" column="goods_name"></result>
+        <result property="goodsPrice" column="goods_price"></result>
+        <result property="goodsNumber" column="goods_number"></result>
+        <result property="goodsWeight" column="goods_weight"></result>
+        <result property="catId" column="cat_id"></result>
+        <result property="goodsIntroduce" column="goods_introduce"></result>
+        <result property="goodsBigLogo" column="goods_big_logo"></result>
+        <result property="goodsSmallLogo" column="goods_small_logo"></result>
+        <result property="catOneId" column="cat_one_id"></result>
+        <result property="catTwoId" column="cat_two_id"></result>
+        <result property="catThreeId" column="cat_three_id"></result>
+        <result property="hotNumber" column="hot_number"></result>
+        <result property="isPromote" column="is_promote"></result>
+        <result property="goodsState" column="goods_state"></result>
+        <result property="isDelete" column="is_delete"></result>
+        <result property="deleteTime" column="delete_time"></result>
+        <result property="createTime" column="create_time"></result>
+        <result property="updateTime" column="update_time"></result>
+        <collection property="pics" ofType="com.yst.management.entity.dto.GoodsPictureCustom" javaType="java.util.ArrayList"
+                    column="goods_id" select="getGoodsPictureByGoodsId">
+            <id property="picsId" column="pics_id"></id>
+            <result property="goodsId" column="goods_id"></result>
+            <result property="picsBig" column="pics_big"></result>
+            <result property="picsMid" column="pics_mid"></result>
+            <result property="picsSma" column="pics_sma"></result>
+        </collection>
+        <collection property="attrs" ofType="com.yst.management.entity.dto.AttributeCustom"
+                    javaType="java.util.ArrayList" column="goods_id" select="getGoodsAttributeByGoodsId">
+            <id property="id" column="id"></id>
+            <result property="goodsId" column="goods_id"></result>
+            <result property="attrId" column="attr_id"></result>
+            <result property="attrValue" column="attr_value"></result>
+            <result property="addPrice" column="add_price"></result>
+            <result property="attrName" column="attr_name"></result>
+            <result property="attrSel" column="attr_sel"></result>
+            <result property="attrWrite" column="attr_write"></result>
+            <result property="attrVals" column="attr_vals"></result>
+        </collection>
+    </resultMap>
+    <!--通过id获取商品信息：商品基本信息、属性信息、图片信息-->
+    <select id="getGoodsById" parameterType="integer" resultMap="goodsMap">
+        SELECT *
+        FROM goods
+        WHERE goods_id = #{id}
+          and is_delete = 0
+    </select>
+    <!--商品图片信息查询-->
+    <select id="getGoodsPictureByGoodsId" resultType="com.yst.management.entity.dto.GoodsPictureCustom">
+        SELECT *
+        FROM goods_picture
+        WHERE goods_id = #{goods_Id}
+    </select>
+    <!--商品属性信息查询-->
+    <select id="getGoodsAttributeByGoodsId" resultType="com.yst.management.entity.dto.AttributeCustom">
+        SELECT *
+        FROM goods_attribute AS ga
+                 LEFT JOIN attribute AS a ON a.attr_id = ga.attr_id
+        WHERE ga.goods_id = #{goods_Id} AND a.is_delete=0
+    </select>
+
+
+    <!--添加商品-->
+    <insert id="addGoods" useGeneratedKeys="true" keyProperty="goodsId" parameterType="com.yst.management.entity.Goods">
+        INSERT INTO goods (goods_name, goods_price, goods_number, goods_weight, cat_id, goods_introduce,
+                           cat_one_id, cat_two_id, cat_three_id)
+        VALUES (#{goodsName}, #{goodsPrice}, #{goodsNumber}, #{goodsWeight}, #{catId}, #{goodsIntroduce}, #{catOneId},
+                #{catTwoId}, #{catThreeId})
+    </insert>
+    <!--批量添加商品对应属性-->
+    <insert id="addBatchAttribute" parameterType="com.yst.management.entity.GoodsAttribute">
+        INSERT INTO goods_attribute (goods_id,attr_id,attr_value) VALUES
+        <foreach collection="attributes" separator="," item="item">
+            (#{item.goodsId},#{item.attrId},#{item.attrValue})
+        </foreach>
+    </insert>
+    <!--批量添加商品对应照片-->
+    <insert id="addBatchPicture" parameterType="com.yst.management.entity.GoodsPicture">
+        INSERT INTO goods_picture (goods_id,pics_big,pics_mid,pics_sma) VALUES
+        <foreach collection="pictures" separator="," item="item">
+            (#{item.goodsId},#{item.picsBig},#{item.picsMid},#{item.picsSma})
+        </foreach>
+    </insert>
+
+    <!--通过商品名查询商品-->
+    <select id="getGoodsByName" parameterType="string" resultType="com.yst.management.entity.Goods">
+        SELECT * FROM goods WHERE is_delete=0 AND goods_name=#{goodsName}
+    </select>
+
+</mapper>

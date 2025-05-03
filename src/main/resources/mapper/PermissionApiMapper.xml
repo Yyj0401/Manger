@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.yst.management.mapper.PermissionApiMapper">
+
+    <!--普通连表查询-->
+
+    <!--连表查询法一：使用association，定义查询结果与实体类的映射关系和表的关联属性-->
+    <!--<resultMap id="PermissionApiMap" type="entity.com.yst.management.PermissionApi">-->
+    <!--    <id property="id" column="id"></id>-->
+    <!--    <result property="permissionId" column="permission_id"></result>-->
+    <!--    <result property="apiService" column="api_service"></result>-->
+    <!--    <result property="apiAction" column="api_action"></result>-->
+    <!--    <result property="apiPath" column="api_path"></result>-->
+    <!--    <result property="apiOrder" column="api_order"></result>-->
+    <!--    <association property="permission" javaType="entity.com.yst.management.Permission">-->
+    <!--        <id property="id" column="permission_id"></id>-->
+    <!--        <result property="name" column="name"></result>-->
+    <!--        <result property="pid" column="pid"></result>-->
+    <!--        <result property="level" column="level"></result>-->
+    <!--    </association>-->
+    <!--</resultMap>-->
+
+    <!--注意：数据库联查时两边有列名相同，会出现值覆盖，可通过设置别名解决
+        association中用column映射查出来的permission_id字段
+    -->
+    <sql id="PermissionFields">
+        pa
+        .
+        id
+        ,pa.permission_id,pa.api_order,pa.api_service,pa.api_action,pa.api_path,p.name,p.pid,p.level
+    </sql>
+    <sql id="PermissionSelect">
+        select
+        <include refid="PermissionFields"></include>
+        from permission_api pa left join permission p on p.id=pa.permission_id where p.id is not null
+    </sql>
+
+    <!--连表查询法二：定义新的返回对象-->
+    <select id="getAllRightList" resultType="com.yst.management.entity.dto.PermissionCustom">
+        <include refid="PermissionSelect"></include>
+        ORDER BY p.level ASC
+    </select>
+
+
+    <!--递归查询出树结构节点：mybatis提供的collection标签自动组织树形结构-->
+    <resultMap id="ParentChildTreeRightMap" type="com.yst.management.entity.vo.PermissionParentChildVo">
+        <id property="id" column="id"></id>
+        <result property="permissionId" column="permission_id"></result>
+        <result property="apiService" column="api_service"></result>
+        <result property="apiAction" column="api_action"></result>
+        <result property="apiPath" column="api_path"></result>
+        <result property="apiOrder" column="api_order"></result>
+        <result property="name" column="name"></result>
+        <result property="pid" column="pid"></result>
+        <result property="level" column="level"></result>
+        <!--使用mybatis collection进行集合查询
+            collection：即为嵌套的List配置
+            property：为private List<...> children的字段名children
+            ofType：为private List children 的类型
+            select：为要递归的sql语句
+            column：上一条语句查询的结果作为下一条语句的参数-->
+        <collection property="children" column="permission_id"
+                    ofType="com.yst.management.entity.vo.PermissionParentChildVo" javaType="java.util.ArrayList"
+                    select="getParentChildRightTree">
+        </collection>
+    </resultMap>
+    <!--父级查询：从pid为0开始递归-->
+    <select id="getAllRightTree" resultMap="ParentChildTreeRightMap">
+        <include refid="PermissionSelect"></include>
+        and p.pid=0
+    </select>
+    <!--关联集合查询-->
+    <select id="getParentChildRightTree" parameterType="int" resultMap="ParentChildTreeRightMap">
+        <include refid="PermissionSelect"></include>
+        and
+        p.pid=#{permission_id}
+    </select>
+
+
+    <resultMap id="ParentChildTreeMenusMap" type="com.yst.management.entity.vo.PermissionParentChildVo">
+        <id property="id" column="id"></id>
+        <result property="permissionId" column="permission_id"></result>
+        <result property="apiService" column="api_service"></result>
+        <result property="apiAction" column="api_action"></result>
+        <result property="apiPath" column="api_path"></result>
+        <result property="apiOrder" column="api_order"></result>
+        <result property="name" column="name"></result>
+        <result property="pid" column="pid"></result>
+        <result property="level" column="level"></result>
+        <!--使用mybatis collection进行集合查询
+            collection：即为嵌套的List配置
+            property：为private List<...> children的字段名children
+            ofType：为private List children 的类型
+            select：为要递归的sql语句
+            column：上一条语句查询的结果作为下一条语句的参数-->
+        <collection property="children" column="permission_id"
+                    ofType="com.yst.management.entity.vo.PermissionParentChildVo" javaType="java.util.ArrayList"
+                    select="getParentChildMenusTree">
+        </collection>
+    </resultMap>
+    <sql id="MenusSelect">
+        and p.level in (0,1) order by pa.api_order asc
+    </sql>
+    <!--获取权限菜单-->
+    <select id="getMenus" resultMap="ParentChildTreeMenusMap">
+        <include refid="PermissionSelect"></include>
+        and p.pid=0
+        <include refid="MenusSelect"></include>
+    </select>
+    <select id="getParentChildMenusTree" parameterType="int" resultMap="ParentChildTreeMenusMap">
+        <include refid="PermissionSelect"></include>
+        and p.pid=#{permission_id}
+        <include refid="MenusSelect"></include>
+    </select>
+
+</mapper>

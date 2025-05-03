@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.yst.management.mapper.OrderMapper">
+
+    <resultMap id="OrderMap" type="com.yst.management.entity.vo.OrderVo">
+        <id property="orderId" column="order_id"></id>
+        <result property="userId" column="user_id"></result>
+        <result property="orderNumber" column="order_number"></result>
+        <result property="orderPrice" column="order_price"></result>
+        <result property="orderPay" column="order_pay"></result>
+        <result property="isSend" column="is_send"></result>
+        <result property="tradeNo" column="trade_no"></result>
+        <result property="orderInvoiceContent" column="order_invoice_content"></result>
+        <result property="consigneeName" column="consignee_name"></result>
+        <result property="consigneePhone" column="consignee_phone"></result>
+        <result property="consigneeAddressCounty" column="consignee_address_county"></result>
+        <result property="consigneeAddressDetail" column="consignee_address_detail"></result>
+        <result property="payStatus" column="pay_status"></result>
+        <result property="createTime" column="create_time"></result>
+        <result property="updateTime" column="update_time"></result>
+        <collection property="goods" column="order_id" javaType="java.util.ArrayList"
+                    ofType="com.yst.management.entity.OrderGoods" select="getOrderGoods">
+            <id property="id" column="id"></id>
+            <result property="orderId" column="order_id"></result>
+            <result property="goodsId" column="goods_id"></result>
+            <result property="goodsPrice" column="goods_price"></result>
+            <result property="goodsNumber" column="goods_number"></result>
+            <result property="goodsTotalPrice" column="goods_total_price"></result>
+            <result property="goodsName" column="goods_name"></result>
+            <result property="goodsWeight" column="goods_weight"></result>
+        </collection>
+    </resultMap>
+
+    <!--***重点：sql片段中不能有where标签！！！
+    使用<if test="_parameter.containsKey('参数')">去判断参数是否存在。
+    -->
+    <sql id="getOrderQuery">
+        <where>
+            <if test="orderNumber != null and orderNumber != ''">
+                and BINARY order_number like concat("%",#{orderNumber},"%")
+            </if>
+            <!--mybatis的一个bug，当判断条件status为整型时，如果status=0时，if test里会判断status=’ '-->
+            <if test="isSend != null">
+                and is_send = #{isSend}
+            </if>
+            <if test="payStatus != null">
+                and pay_status = #{payStatus}
+            </if>
+        </where>
+    </sql>
+
+    <!--分页查询-->
+    <select id="getOrderByPage" resultMap="OrderMap">
+        SELECT * FROM `order`
+        <include refid="getOrderQuery"></include>
+        order by create_time DESC
+        limit #{startPage},#{pageSize}
+    </select>
+
+    <!--总数查询-->
+    <select id="getOrderCount" resultType="long">
+        SELECT COUNT(1) FROM `order`
+        <include refid="getOrderQuery"></include>
+    </select>
+
+    <!--子查询查询：order_goods和goods连表-->
+    <sql id="getOrderGoodsAttr">
+        og
+        .
+        id
+        ,og.order_id,og.goods_id,og.goods_number,og.goods_total_price,g.goods_name,g.goods_weight,g.goods_price
+    </sql>
+    <select id="getOrderGoods" parameterType="integer" resultType="com.yst.management.entity.OrderGoods">
+        SELECT<include refid="getOrderGoodsAttr"></include>FROM order_goods as og inner join goods as g on
+        og.goods_id=g.goods_id where og.order_id=#{order_id} and g.is_delete=0 order by g.create_time DESC
+    </select>
+
+    <!--通过id查询订单-->
+    <select id="getOrderById" parameterType="integer" resultMap="OrderMap">
+        SELECT *
+        FROM `order`
+        WHERE order_id = #{id}
+    </select>
+
+    <!--修改订单-->
+    <update id="updateOrder" parameterType="com.yst.management.entity.vo.OrderVo">
+        UPDATE `order`
+        SET order_invoice_content=#{orderInvoiceContent},
+            consignee_name=#{consigneeName},
+            consignee_phone=#{consigneePhone},
+            consignee_address_county=#{consigneeAddressCounty},
+            consignee_address_detail=#{consigneeAddressDetail}
+        WHERE order_id = #{orderId}
+    </update>
+
+    <!--删除订单-->
+    <delete id="deleteOrderById" parameterType="integer">
+        DELETE
+        FROM `order`
+        WHERE order_id = #{id}
+    </delete>
+    <!--删除订单对应商品-->
+    <delete id="deleteOrderGoodsByOrderId" parameterType="integer">
+        DELETE
+        FROM order_goods
+        WHERE order_id = #{orderId}
+    </delete>
+
+</mapper>

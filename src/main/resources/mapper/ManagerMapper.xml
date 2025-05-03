@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<!--注意，这里的namespace就是指向哪一个mapper-->
+<mapper namespace="com.yst.management.mapper.ManagerMapper">
+
+    <!--resultMap：配置自定义映射，和mybatis开启驼峰命名只能选择一个
+            属性：
+                id：表示自定义映射的唯一标识，不能重复
+                type：查询的数据要映射的实体类的类型
+            子标签：
+                id：设置主键的映射关系
+                result：设置普通字段的映射关系
+            子标签属性：
+                property：设置映射关系中实体类中的属性名
+                column：设置映射关系中表中的字段名
+      -->
+    <resultMap id="ManagerCustomMap" type="com.yst.management.entity.vo.ManagerVo">
+        <id property="id" column="id"></id>
+        <result property="username" column="username"></result>
+        <result property="password" column="password"></result>
+        <result property="email" column="email"></result>
+        <result property="phone" column="phone"></result>
+        <result property="avatarUrl" column="avatar_url"></result>
+        <result property="roleId" column="role_id"></result>
+        <result property="createTime" column="create_time"></result>
+        <result property="updateTime" column="update_time"></result>
+        <result property="status" column="status"></result>
+        <result property="isDeleted" column="is_deleted"></result>
+        <result property="roleName" column="name"></result>
+        <result property="roleDescription" column="description"></result>
+    </resultMap>
+
+    <!--整合常用查询属性-->
+    <sql id="ManagerFields">
+        manager.id as id,username,email,phone,gender,age,address,avatar_url,role_id,create_time,update_time,status,is_deleted
+    </sql>
+
+    <!--连表查询SQl：管理员表与角色表-->
+    <sql id="ManagerRoleFields">
+        select <include refid="ManagerFields"></include>,name,description from manager left join role on manager.role_id=role.id
+    </sql>
+
+    <!--id是mapper里面的方法名，resultType就是返回的类型-->
+    <!--分页查询-->
+    <select id="findManagerByPage" resultMap="ManagerCustomMap">
+        <include refid="ManagerRoleFields"></include>
+        <!-- where标签可以自动添加where，同时处理sql语句中第一个and关键字 -->
+        <where>
+            <!--BINARY：模糊查询区分大小写-->
+            <if test="username != null and username != ''">
+                and BINARY username like concat("%",#{username},"%")
+            </if>
+        </where>
+        order by create_time DESC
+        limit #{startPage},#{pageSize}
+    </select>
+
+    <!--总数查询：当前条件下的总条数-->
+    <select id="findManagerCount" resultType="long" parameterType="string">
+        select count(1)
+        from manager
+        <where>
+            <!--BINARY：模糊查询区分大小写-->
+            <if test="username != null and username != ''">
+                and BINARY username like concat("%",#{username},"%")
+            </if>
+        </where>
+    </select>
+
+    <!--登录验证-->
+    <select id="login" parameterType="com.yst.management.entity.vo.ManagerLoginVo" resultType="com.yst.management.entity.vo.ManagerLoginVo">
+        select *
+        from manager
+        where username = #{username}
+    </select>
+
+    <!--新增用户：insert返回受影响行数
+        useGeneratedKeys：是否回填数据库自动生成的主键
+        keyProperty：主键回填到实体类中哪个属性
+        parameterType：参数类型, 通常都可以省略
+    -->
+    <insert id="savaManager" useGeneratedKeys="true" keyProperty="id"
+            parameterType="com.yst.management.entity.Manager">
+        insert into manager(username, password, email, phone,gender,age,address,role_id)
+        values (#{username}, #{password}, #{email}, #{phone},#{gender},#{age},#{address},#{roleId})
+    </insert>
+
+    <!--删除用户：delete返回受影响行数-->
+    <delete id="deleteManagerById" parameterType="long">
+        delete
+        from manager
+        where id = #{id}
+    </delete>
+
+    <!--批量删除用户
+        foreach
+            collection：指定要遍历的集合
+            item：表示本次迭代获取的元素
+            index：索引，index指定一个名字，值为每次迭代到的位置
+            separator：表示在每次进行迭代之间以什么符号作为分隔符
+            open：表示本次迭代获取的元素，最常用的是左括弧‘(’，注意:mybatis会将该字符拼接到整体的sql语句之前，并且只拼接一次，该参数为可选项
+            close：表示该语句以什么结束，最常用的是右括弧’)’，注意:mybatis会将该字符拼接到整体的sql语句之后，该参数为可选项
+    -->
+    <delete id="batchDeleteManager" parameterType="long">
+        delete from manager where id in
+        <foreach collection="ids" separator="," item="id" open="(" close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <!--更新用户：update返回受影响行数-->
+    <update id="updateManagerById" parameterType="com.yst.management.entity.Manager">
+        update manager
+        set username=#{username},
+            password=#{password},
+            email=#{email},
+            phone=#{phone},
+            gender=#{gender},
+            age=#{age},
+            address=#{address}
+        where id = #{id}
+    </update>
+    
+    <!--用户角色分配-->
+    <update id="updateManagerRoleId" parameterType="com.yst.management.entity.Manager">
+        update manager set role_id=#{roleId} where id=#{id}
+    </update>
+
+    <!--根据Id查询用户-->
+    <select id="findManagerById" resultMap="ManagerCustomMap" parameterType="long">
+        <include refid="ManagerRoleFields"></include> where manager.id=#{id}
+    </select>
+
+    <!--根据用户名查询用户-->
+    <select id="findManagerByName" parameterType="string" resultType="com.yst.management.entity.Manager">
+        SELECT
+        <include refid="ManagerFields"></include>
+        FROM manager WHERE username=#{username}
+    </select>
+
+    <!--根据用户id和用户名查询用户：防止修改成重复的用户名-->
+    <select id="findManagerByIdAndName" resultType="com.yst.management.entity.Manager">
+        SELECT
+        <include refid="ManagerFields"></include>
+        FROM manager WHERE
+        username = #{username}
+        AND id != #{id}
+    </select>
+    
+    <!--修改管理员状态-->
+    <update id="updateManagerStatus" parameterType="com.yst.management.entity.Manager">
+        UPDATE manager SET status=#{status} where id=#{id}
+    </update>
+</mapper>
